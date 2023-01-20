@@ -54,8 +54,8 @@ mainCl.start()
 tasks_queue = []
 
 
-def new_task(receiver, entity, file, text):
-    tasks_queue.append([receiver, entity, file, text])
+def new_task(receiver, entity, file, text, banner):
+    tasks_queue.append([receiver, entity, file, text, banner])
 
 
 stop_threads_queue = []
@@ -65,13 +65,14 @@ def stop_thread(th_id):
     stop_threads_queue.append(th_id)
 
 
-async def thread(msg: str, chat: int, thread_id: int, sleep_min: int = 60):
+async def thread(msg: str, chat: int, thread_id: int, sleep_min: int, need_banner):
     while thread_id not in stop_threads_queue:
         new_task(
             receiver=chat,
             entity=chat,
             file='banner.jpg',
             text=msg,
+            banner=need_banner
         )
         sleep(int(sleep_min) * 60)
 
@@ -82,11 +83,11 @@ async def thread(msg: str, chat: int, thread_id: int, sleep_min: int = 60):
     )
 
 
-def chat_thread(msg: str, chat: int, thread_id: int, sleep_min: int = 60):
+def chat_thread(msg: str, chat: int, thread_id: int, sleep_min: int, need_banner: bool):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    loop.run_until_complete(thread(msg, chat, thread_id, sleep_min))
+    loop.run_until_complete(thread(msg, chat, thread_id, sleep_min, need_banner))
     loop.close()
 
 
@@ -98,7 +99,7 @@ def files(path):
 
 async def main(mainClient):
     # Console setup
-    windll.kernel32.SetConsoleTitleW(f'Auto_Sender by @princemelancholy')
+    windll.kernel32.SetConsoleTitleW(f'Auto_Sender by @werfcrypto (TG)')
     system('cls')
 
     # Getting chats
@@ -109,28 +110,37 @@ async def main(mainClient):
     for chat in chats:
         with open('chats\\' + chat, encoding='utf-8') as f:
             raw = f.readlines()
-        chat_id, sleep_min = raw.pop(0).split(';')
+        chat_id, sleep_min, need_banner = raw.pop(0).split(';')
         msg = ''.join(raw)
-
-        chats_and_msgs.append([chat_id, msg, sleep_min])
+        print(str(need_banner))
+        chats_and_msgs.append([chat_id, msg, sleep_min, eval(need_banner)])
 
     # Starting threads
     i = 0
     for chat in chats_and_msgs:
-        chat_id, message, sleep_min = chat
+        chat_id, message, sleep_min, need_banner = chat
         chat_id = int(chat_id) if chat_id[1:].isdigit() else chat_id
-        x = threading.Thread(target=chat_thread, args=(message, chat_id, i, sleep_min))
+        x = threading.Thread(target=chat_thread, args=(message, chat_id, i, sleep_min, need_banner))
         x.start()
         i += 1
 
     # Waiting for tasks
+    print('started successfully')
     while True:
         if len(tasks_queue) > 0:
             task = tasks_queue.pop(0)
-            await mainClient.send_message(
-                task[0],
-                task[3]
-            )
+            if task[4]:
+                await mainClient.send_file(
+                    receiver=task[0],
+                    entity=task[1],
+                    file=task[2],
+                    caption=task[3],
+                )
+            else:
+                await mainClient.send_message(
+                    task[0],
+                    task[3]
+                )
         sleep(1)
 
 
